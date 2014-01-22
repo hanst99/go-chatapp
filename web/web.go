@@ -1,5 +1,5 @@
 //Provides generic low level web functionality, like sessions
-package main;
+package web;
 
 import (
     "net/http"
@@ -20,8 +20,8 @@ type SessionConfig struct {
 }
 
 type SessionStorage struct {
-    sessions       map[uint]Session
-    sessionCounter uint
+    sessions       map[uint64]Session
+    sessionCounter uint64
     config         SessionConfig
     mutex          sync.Mutex
 }
@@ -29,7 +29,7 @@ type SessionStorage struct {
 
 func CreateSessionStorage(config SessionConfig) *SessionStorage {
     storage := &SessionStorage {
-        sessions: make(map[uint]Session),
+        sessions: make(map[uint64]Session),
         sessionCounter: 0,
         config: config,
     }
@@ -61,7 +61,7 @@ func (this *SessionStorage) cleanUp() {
 func (this *SessionStorage) GetSession(req *http.Request) (Session,error) {
     //look for session cookie
     sCookie,err := req.Cookie("session")
-    var sessionId uint
+    var sessionId uint64
     this.mutex.Lock()
     defer this.mutex.Unlock()
     if(err != nil) {
@@ -72,7 +72,7 @@ func (this *SessionStorage) GetSession(req *http.Request) (Session,error) {
         this.sessionCounter += 1
     } else {
         //if a session already exists
-        id,err := strconv.Atoi(sCookie.Value)
+        sessionId,err = strconv.ParseUint(sCookie.Value,10,64)
         if(err != nil) {
             //if conversion failed
             return Session{},err;
