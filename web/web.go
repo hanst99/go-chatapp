@@ -5,6 +5,7 @@ import (
     "net/http"
     "time"
     "strconv"
+    "errors"
     "fmt"
     "sync"
 )
@@ -16,11 +17,20 @@ type Session struct {
 }
 
 func (this *Session) GetVal(name string)(string,error) {
+    val,ok := this.storage[name]
+    if !ok {
+        return "", errors.New("No such value in session!")
+    }
+    return val,nil
+}
 
+func (this *Session) PutVal(name string, val string) {
+    this.storage[name]=val
 }
 
 type SessionConfig struct {
     ValidFor time.Duration
+    ClearInterval time.Duration
 }
 
 type SessionStorage struct {
@@ -40,24 +50,32 @@ func CreateSessionStorage(config SessionConfig) *SessionStorage {
         done: make(chan bool),
         config: config,
     }
-    //start clearing sessions every 5 minutes
-    //until told to stop
+    storage.StartClearingSessions()
+    return storage
+}
+
+// start clearing invalid (outdated) sessions from the storage,
+// after every config.ClearInterval
+//Note: Normally there's no need to call this function -
+// it is done automatically upon creating a session storage
+func (this *SessionStorage) StartClearingSessions() {
     go func() {
         for {
             select {
-            case <-storage.done:
+            case <-this.done:
                 break
             default:
-                storage.cleanUp()
-                time.Sleep(5 * time.Minute)
+                this.cleanUp()
+                time.Sleep(this.config.ClearInterval)
             }
         }
     }()
-    return storage
 }
 
 //Call this to stop clearing out of date sessions
 //you should not use the session storage after calling this function
+//Note: if StartClearingSessions was called more than once,
+//this needs to be called once for each of those calls
 func (this *SessionStorage) StopClearingSessions() {
     this.done<-true
 }
@@ -73,10 +91,20 @@ func (this *SessionStorage) cleanUp() {
     }
 }
 
+//Creates a session and places its id in the session cookie of the response
+//Note: Normally, you'd call GetSession instead
+func (this *SessionStorage) CreateSession(w http.ResponseWriter) (*Session) {
+        session := &Session{ lastAccessed: time.Now(), storage: make(map[string]string) }
+        this.sessions[this.sessionCounter] = session
+        http.SetCookie(w, &http.Cookie{Name: "session", Value: fmt.Sprint(this.sessionCounter)})
+        this.sessionCounter += 1
+        session.lastAccessed = time.Now()
+        return session
+}
 
 //gets a session for this request
 //if no session exists yet, create one
-func (this *SessionStorage) GetSession(req *http.Request) (*Session,error) {
+func (this *SessionStorage) GetSession(w http.ResponseWriter, req *http.Request) (*Session,error) {
     //look for session cookie
     sCookie,err := req.Cookie("session")
     var sessionId uint64
@@ -84,10 +112,7 @@ func (this *SessionStorage) GetSession(req *http.Request) (*Session,error) {
     defer this.mutex.Unlock()
     if(err != nil) {
         //if there's no session associated
-        this.sessions[this.sessionCounter] = &Session{ lastAccessed: time.Now(), storage: make(map[string]string) };
-        sessionId = this.sessionCounter
-        req.AddCookie(&http.Cookie{Name: "session", Value: fmt.Sprint(sessionId)})
-        this.sessionCounter += 1
+        return this.CreateSession(w),nil
     } else {
         //if a session already exists
         sessionId,err = strconv.ParseUint(sCookie.Value,10,64)
@@ -96,7 +121,10 @@ func (this *SessionStorage) GetSession(req *http.Request) (*Session,error) {
             return nil,err;
         }
     }
-    session := this.sessions[sessionId]
+    session,ok := this.sessions[sessionId]
+    if !ok {
+        return this.CreateSession(w),nil
+    }
     session.lastAccessed = time.Now()
     return session,nil
 }

@@ -7,12 +7,13 @@ import (
     "html/template"
     "github.com/hanst99/go-chatapp/web"
     "log"
+    "sync"
+    "io/ioutil"
 )
 
 
 type user struct {
     Name string
-    Color uint32
 }
 
 type message struct {
@@ -24,10 +25,37 @@ type message struct {
 type chatRoom struct {
     Messages []message
     Name string
+    mutex sync.Mutex
+}
+
+func (this *chatRoom) PostMessage(m message) {
+    this.mutex.Lock()
+    defer this.mutex.Unlock()
+    this.Messages = append(this.Messages,m)
 }
 
 
-var session *web.SessionStorage
+var sessionStorage *web.SessionStorage
+var defaultRoom chatRoom = chatRoom{Messages: []message{},Name: "Default Room"}
+
+func postMessage(w http.ResponseWriter, r *http.Request) {
+    if(r.Method != "POST") {
+        log.Fatal("/post_message must be POST'ed to!")
+    }
+    session,err := sessionStorage.GetSession(w,r)
+    if err != nil {
+        log.Fatal(err)
+    }
+    username,err := session.GetVal("user.name")
+    if err != nil {
+        log.Fatal(err)
+    }
+    content,err := ioutil.ReadAll(r.Body)
+    if err != nil {
+        log.Fatal(err)
+    }
+    defaultRoom.PostMessage(message {From: user{username}, At: time.Now(), Content: string(content)})
+}
 
 // the index page of the chat
 func index(indexTemplate *template.Template, w http.ResponseWriter, r *http.Request) {
@@ -36,7 +64,25 @@ func index(indexTemplate *template.Template, w http.ResponseWriter, r *http.Requ
     w.Header().Set("Cache-Control","no-cache,no-store,must-revalidate")
     w.Header().Set("Pragma:", "no-cache")
     w.Header().Set("Expires","0")
-    err := indexTemplate.Execute(w,user {Name: "hannes"})
+    session,err := sessionStorage.GetSession(w,r)
+    if err != nil {
+        log.Fatal(err)
+    }
+    if r.Method == "POST" {
+        user := r.FormValue("username")
+        session.PutVal("user.name",user)
+    }
+    _,err = session.GetVal("user.name")
+    if err != nil {
+        err = indexTemplate.ExecuteTemplate(w,"signup",nil)
+        if err != nil {
+            log.Fatal(err)
+        }
+        return
+    }
+    defaultRoom.mutex.Lock()
+    defer defaultRoom.mutex.Unlock()
+    err = indexTemplate.ExecuteTemplate(w,"default_chat",defaultRoom)
     if err != nil {
        log.Fatal(err)
     }
@@ -55,14 +101,16 @@ func wrapTemplate(templ *template.Template, server templateServer) http.HandlerF
 }
 
 func StartApp(port uint16) error {
-    session = web.CreateSessionStorage(web.SessionConfig{ValidFor: 15*time.Minute})
-    indexTemplate,err := template.ParseFiles("views/pullchat/index.html")
+    sessionStorage = web.CreateSessionStorage(web.SessionConfig{ValidFor: 15*time.Minute, ClearInterval: 5*time.Minute})
+    defer sessionStorage.StopClearingSessions()
+    indexTemplate,err := template.ParseFiles("views/pullchat/index.html","views/pullchat/signup.html")
     if err != nil {
         return err
     }
     handler := http.NewServeMux()
     handler.HandleFunc("/",wrapTemplate(indexTemplate,index))
     handler.HandleFunc("/public/",public)
+    handler.HandleFunc("/post_message",postMessage)
     err = http.ListenAndServe(fmt.Sprint(":",port), handler)
     if err != nil {
         return err
