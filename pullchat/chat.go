@@ -5,6 +5,7 @@ import (
     "fmt"
     "time"
     "html/template"
+    "github.com/hanst99/go-chatapp/web"
     "log"
 )
 
@@ -25,6 +26,10 @@ type chatRoom struct {
     Name string
 }
 
+
+var session *web.SessionStorage
+
+// the index page of the chat
 func index(indexTemplate *template.Template, w http.ResponseWriter, r *http.Request) {
     //disable caching: HTTP/1.1 HTTP/1.0 and proxies
     //from http://stackoverflow.com/questions/49547/making-sure-a-web-page-is-not-cached-across-all-browsers
@@ -41,15 +46,16 @@ func public(w http.ResponseWriter, r *http.Request) {
     http.ServeFile(w,r,r.URL.Path[1:])
 }
 
-type TemplateServer func(*template.Template, http.ResponseWriter, *http.Request)
+type templateServer func(*template.Template, http.ResponseWriter, *http.Request)
 
-func wrapTemplate(templ *template.Template, server TemplateServer) http.HandlerFunc {
+func wrapTemplate(templ *template.Template, server templateServer) http.HandlerFunc {
     return http.HandlerFunc(func (w http.ResponseWriter, r *http.Request) {
         server(templ,w,r)
     })
 }
 
 func StartApp(port uint16) error {
+    session = web.CreateSessionStorage(web.SessionConfig{ValidFor: 15*time.Minute})
     indexTemplate,err := template.ParseFiles("views/pullchat/index.html")
     if err != nil {
         return err
