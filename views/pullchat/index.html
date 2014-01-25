@@ -13,11 +13,9 @@
     <h1>Hello</h1>
     <p>Welcome to the chatroom {{.Name}}!</p>
     <ul id="chatbox">
-        <!-- Chat messages go here, as <li> elements with 2 p parents -->
-        <li>
-        </li>
+        <!-- Chat messages go here, as <li> elements with 2 p children -->
         {{ range .Messages}}
-        <li><p class="from"> [{{.From.Name}};{{.At}}] </p>
+        <li><p class="from"> [{{.From.Name}};{{ printf "%d:%d:%d" .At.Hour .At.Minute .At.Second }}] </p>
         <p class="message">{{.Content}}</p></li>
         {{ end }}
     </ul>
