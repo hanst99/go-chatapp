@@ -1,9 +1,9 @@
-{{ define "pull_chat" }}
+{{ define "push_chat" }}
 <!DOCTYPE html>
 <html>
 <head>
     <script src="//ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
-    <script type="text/javascript" charset="utf-8" src="/public/pullchat.js"> 
+    <script type="text/javascript" charset="utf-8" src="/public/pushchat.js"> 
     </script>
     <link rel="stylesheet" href="/public/chat.css" type="text/css" media="screen">
     <title>Index</title>
@@ -14,10 +14,6 @@
     <p>Welcome to the chatroom {{.Name}}!</p>
     <ul id="chatbox">
         <!-- Chat messages go here, as <li> elements with 2 p children -->
-        {{ range .Messages}}
-        <li><p class="from"> [{{.From.Name}};{{ printf "%d:%d:%d" .At.Hour .At.Minute .At.Second }}] </p>
-        <p class="message">{{.Content}}</p></li>
-        {{ end }}
     </ul>
     <form id="message_form">
         <input type="text" value="" id="message">

@@ -82,7 +82,7 @@ func index(indexTemplate *template.Template, w http.ResponseWriter, r *http.Requ
     }
     defaultRoom.mutex.Lock()
     defer defaultRoom.mutex.Unlock()
-    err = indexTemplate.ExecuteTemplate(w,"default_chat",defaultRoom)
+    err = indexTemplate.ExecuteTemplate(w,"pull_chat",defaultRoom)
     if err != nil {
        log.Fatal(err)
     }
@@ -101,7 +101,9 @@ func wrapTemplate(templ *template.Template, server templateServer) http.HandlerF
 }
 
 func StartApp(port uint16) error {
-    sessionStorage = web.CreateSessionStorage(web.SessionConfig{ValidFor: 15*time.Minute, ClearInterval: 5*time.Minute})
+    sessionStorage = web.CreateSessionStorage(web.SessionConfig{
+        ValidFor: 15*time.Minute,
+        ClearInterval: 5*time.Minute})
     defer sessionStorage.StopClearingSessions()
     indexTemplate,err := template.ParseFiles("views/pullchat/index.html","views/pullchat/signup.html")
     if err != nil {
