@@ -19,8 +19,10 @@
         <p class="message">{{.Content}}</p></li>
         {{ end }}
     </ul>
-    <input type="text" value="" id="message">
-    <input type="button"  value="Post" id="post_button">
+    <form id="message_form">
+        <input type="text" value="" id="message">
+        <input type="submit"  value="Post">
+    </form>
     </body>
 </html>
 {{ end }}
