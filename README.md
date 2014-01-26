@@ -1,6 +1,6 @@
 Go Chatapp
 ===========
 
-When done, supposed to be examples of how to write both push and pull chat webapps in the Go language
+Examples of how to implement push and pull chats in the go programming language
 
-_Warning: Not anywhere near done yet!_
+Usage: (from within the package root) `go-chatapp --port <port> --mode <"push"|"pull">`
